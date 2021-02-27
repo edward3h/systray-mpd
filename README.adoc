@@ -1,0 +1,7 @@
+= Systray-MPD
+Edward <jaq@ethelred.org>
+v1.0
+
+All I wanted was a play/pause button for https://www.musicpd.org/[MPD] in my Mac menu bar, but I couldn't find one. So I made it.
+
+Although I made it for my Mac it uses pure Java dependencies so should work on other systems.
