@@ -1,6 +1,5 @@
 package org.ethelred.desktop;
 
-import org.bff.javampd.monitor.StandAloneMonitor;
 import org.bff.javampd.player.Player;
 import org.bff.javampd.playlist.PlaylistBasicChangeEvent;
 import org.bff.javampd.server.MPD;
@@ -9,9 +8,11 @@ import org.bff.javampd.server.MPDConnectionException;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
 
@@ -56,13 +57,42 @@ public class SystrayMPD
         }
     }
 
+    enum AppImage {
+        disconnected("sync-solid"),
+        play("play-solid"),
+        pause("pause-solid"),
+        next("step-forward-solid");
+
+        private final String filename;
+        private volatile Image image;
+
+        AppImage(String filename)
+        {
+            this.filename = filename;
+        }
+
+        Image get()
+        {
+            if (image == null)
+            {
+                synchronized (this)
+                {
+                    if (image == null)
+                    {
+                        image = _getImage("/" + filename + ".png");
+                    }
+                }
+            }
+            return image;
+        }
+    }
 
     enum State {
         disconnected {
             @Override
-            public String imageName()
+            public AppImage image()
             {
-                return "disconnected";
+                return AppImage.disconnected;
             }
 
             @Override
@@ -79,9 +109,9 @@ public class SystrayMPD
         }, playing
                 {
                     @Override
-                    public String imageName()
+                    public AppImage image()
                     {
-                        return "pause";
+                        return AppImage.pause;
                     }
 
                     @Override
@@ -98,9 +128,9 @@ public class SystrayMPD
                 }, paused
                 {
                     @Override
-                    public String imageName()
+                    public AppImage image()
                     {
-                        return "play";
+                        return AppImage.play;
                     }
 
                     @Override
@@ -116,15 +146,12 @@ public class SystrayMPD
                     }
                 };
 
-        public abstract String imageName();
+        public abstract AppImage image();
         public abstract String toolTip(SystrayMPD systrayMPD);
         public abstract void action(SystrayMPD systrayMPD);
     }
     private State state;
 
-    private final Map<String, Image> imageMap =
-            Set.of("play", "pause", "disconnected").stream()
-            .collect(Collectors.toMap(n -> n, n -> _getImage("/" + n + ".png")));
     private TrayIcon icon; // we only have one
 
     private String mpdHost;
@@ -132,6 +159,7 @@ public class SystrayMPD
     private boolean showNotifications;
 
     private MPD mpd;
+    private final Map<MenuItem, Predicate<SystrayMPD>> menuConditions = new HashMap<>();
 
     public SystrayMPD()
     {
@@ -140,7 +168,7 @@ public class SystrayMPD
             _loadPreferences();
             var systray = SystemTray.getSystemTray();
             var menu = _buildMenu();
-            icon = new TrayIcon(imageMap.get("disconnected"), "Disconnected", menu);
+            icon = new TrayIcon(AppImage.disconnected.get(), "Disconnected", menu);
             icon.addActionListener(this::_action);
             systray.add(icon);
 
@@ -231,8 +259,9 @@ public class SystrayMPD
             return;
         }
         this.state = state;
-        icon.setImage(imageMap.get(state.imageName()));
+        icon.setImage(state.image().get());
         icon.setToolTip(state.toolTip(this));
+        _menuUpdate();
     }
 
     private void _loadPreferences()
@@ -251,18 +280,28 @@ public class SystrayMPD
         node.putBoolean("mpdNotifications", showNotifications);
     }
 
+    private void _menuUpdate()
+    {
+        menuConditions.forEach((mi, pred) -> mi.setEnabled(pred.test(this)));
+    }
+
     private PopupMenu _buildMenu()
     {
         var menu = new PopupMenu();
-        menu.add(_menuItem("Preferences...", evt -> new org.ethelred.desktop.Preferences(this).show()));
-        menu.add(_menuItem("Quit", evt -> System.exit(0)));
+        menu.add(_menuItem("Play", evt -> State.paused.action(this), x -> x.state == State.paused));
+        menu.add(_menuItem("Pause", evt -> State.playing.action(this), x -> x.state == State.playing));
+        menu.add(_menuItem("Next", evt -> mpd.getPlayer().playNext(), x -> x.state == State.playing));
+        menu.addSeparator();
+        menu.add(_menuItem("Preferences...", evt -> new org.ethelred.desktop.Preferences(this).show(), x -> true));
+        menu.add(_menuItem("Quit", evt -> System.exit(0), x -> true));
         return menu;
     }
 
-    private MenuItem _menuItem(String label, ActionListener actionListener)
+    private MenuItem _menuItem(String label, ActionListener actionListener, Predicate<SystrayMPD> condition)
     {
         var mi = new MenuItem(label);
         mi.addActionListener(actionListener);
+        menuConditions.put(mi, condition);
         return mi;
     }
 
@@ -278,9 +317,9 @@ public class SystrayMPD
         }
     }
 
-    private Image _getImage(String path)
+    private static Image _getImage(String path)
     {
-        return Toolkit.getDefaultToolkit().getImage(getClass().getResource(path));
+        return Toolkit.getDefaultToolkit().getImage(SystrayMPD.class.getResource(path));
     }
 
 }
