@@ -1,10 +1,17 @@
 plugins {
     id 'java'
     id 'application'
+    id 'org.beryx.runtime' version '1.12.4'
 }
 
 group 'org.ethelred'
-version '1.0-SNAPSHOT'
+version '1.0'
+
+java {
+    toolchain {
+                languageVersion = JavaLanguageVersion.of(14)
+    }
+}
 
 repositories {
     mavenCentral()
@@ -27,7 +34,8 @@ dependencies {
 }
 
 application {
-    mainClassName("org.ethelred.desktop.SystrayMPD")
+    mainClassName = 'org.ethelred.desktop.SystrayMPD'
+    applicationName = 'systray-mpd' 
 }
 
 test {
@@ -44,5 +52,29 @@ task compileJava(type: JavaCompile, overwrite: true, dependsOn: configurations.c
                 source: sourceCompatibility,
                 target: targetCompatibility,
                 includeAntRuntime: false
+    }
+}
+
+runtime {
+    options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+    launcher {
+        noConsole = true
+    }
+    jpackage {
+        def currentOs = org.gradle.internal.os.OperatingSystem.current()
+        def imgType = currentOs.windows ? 'ico' : currentOs.macOsX ? 'icns' : 'png'
+        imageOptions += ['--icon', "src/main/resources/icon.$imgType"]
+        installerOptions += ['--resource-dir', "src/main/resources"]
+        installerOptions += ['--vendor', 'Edward Harman']
+
+        if(currentOs.windows) {
+            installerOptions += ['--win-per-user-install', '--win-dir-chooser', '--win-menu', '--win-shortcut']
+        }
+        else if (currentOs.linux) {
+            installerOptions += ['--linux-package-name', 'systray-mpd','--linux-shortcut']
+        }
+        else if (currentOs.macOsX) {
+            installerOptions += ['--mac-package-name', 'systray-mpd']
+        }
     }
 }
