@@ -15,6 +15,9 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.prefs.Preferences;
 import java.util.stream.Collectors;
+import java.io.*;
+
+import javax.swing.JOptionPane;
 
 /**
  * TODO
@@ -174,10 +177,9 @@ public class SystrayMPD
 
             _reconnect();
         }
-        catch (Exception e)
+        catch (Throwable e)
         {
-            System.err.println("Caught an exception " + e.getMessage());
-            e.printStackTrace(System.err);
+            _report("init", e);
         }
     }
 
@@ -191,7 +193,7 @@ public class SystrayMPD
                 {
                     mpd.close();
                 } catch (Exception e) {
-                    // whatevs
+                    _report("mpd.close()", e);
                 }
             }
             mpd = new MPD.Builder()
@@ -236,6 +238,7 @@ public class SystrayMPD
         }
         catch (MPDConnectionException e)
         {
+            _report("reconnect", e);
             _enter(State.disconnected);
         }
     }
@@ -258,6 +261,7 @@ public class SystrayMPD
         {
             return;
         }
+        _debug("Enter state " + state);
         this.state = state;
         icon.setImage(state.image().get());
         icon.setToolTip(state.toolTip(this));
@@ -270,6 +274,7 @@ public class SystrayMPD
         mpdHost = node.get("mpdHost", "localhost");
         mpdPort = node.getInt("mpdPort", 6600);
         showNotifications = node.getBoolean("mpdNotifications", true);
+        _debug(mpdHost + ":" + mpdPort);
     }
 
     private void _savePreferences()
@@ -322,4 +327,20 @@ public class SystrayMPD
         return Toolkit.getDefaultToolkit().getImage(SystrayMPD.class.getResource(path));
     }
 
+    private void _report(String when, Throwable e) {
+        var sw = new StringWriter();
+        var w = new PrintWriter(sw);
+        w.append(when).append(": ");
+        e.printStackTrace(w);
+        JOptionPane.showMessageDialog(
+            null, // unknown parent component
+            sw.toString(),
+            "systray-mpd error!",
+            JOptionPane.ERROR_MESSAGE
+        );
+    }
+
+    private void _debug(String message) {
+        // JOptionPane.showMessageDialog(null, message);
+    }
 }

@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'application'
-    id 'org.beryx.runtime' version '1.12.4'
+    id 'org.beryx.runtime' version '1.12.5'
 }
 
 group 'org.ethelred'
@@ -27,7 +27,7 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
 
-    implementation group: 'org.hihn', name: 'javampd', version: '6.2.2'
+    implementation group: 'org.hihn', name: 'javampd', version: '6.2.5'
     implementation 'com.jetbrains.intellij.java:java-gui-forms-rt:203.7148.30'
 
     antTask 'com.jetbrains.intellij.java:java-compiler-ant-tasks:203.7148.30'
@@ -57,6 +57,7 @@ task compileJava(type: JavaCompile, overwrite: true, dependsOn: configurations.c
 
 runtime {
     options = ['--strip-debug', '--compress', '2', '--no-header-files', '--no-man-pages']
+    modules = ['java.desktop', 'java.prefs', 'java.logging']
     launcher {
         noConsole = true
     }
